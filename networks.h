@@ -106,6 +106,8 @@ int removeCar(struct CarBuffer *carBuffer, int carNumber);
 struct Car *findCar(struct CarBuffer *carBuffer, int socketNumber);
 struct Car *addCar(struct Car *carList, struct Car * car);
 
+void printCars(struct Car *car);
+void printCarList(struct CarBuffer *list);
 
 void *initServer(void *input);
 struct CarBuffer *startSwitch();

@@ -7,7 +7,8 @@ int main(int argc, char const *argv[])
     struct CarBuffer *buffer = startSwitch();
     char payload[PAYLOADSIZE];
     while(1){
-        sleep(0.8);
+        sleep(1);
+        printCarList(buffer);
         for (i = 0; i < buffer->bufferSize; i++) {
             if (buffer->buffer != NULL) {
                 memset(payload, 0, PAYLOADSIZE);

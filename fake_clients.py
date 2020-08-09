@@ -4,17 +4,22 @@ import time
 import threading
 import errno
 from datetime import datetime
+import random
+
+def updateCar(car):
+   car.speed = random.randint(1, 10)
+   car.x_pos = car.x_pos + car.speed
+   car.y_pos = random.randint(0, 5)
 
 
 def drive(car):
    while True:
       car.receive_data()
+      updateCar(car)
       if not pause:
          car.send_data()
-
-      car.x_pos += 1
       start = datetime.now()
-      time.sleep(0.1)
+      time.sleep(0.5)
       end = datetime.now()
       delta = end - start
       sleep_length = delta.seconds + delta.microseconds / 1000000.0
@@ -40,7 +45,8 @@ def watchForCommand():
          assert(False)
 
 class Car:
-   carNumber = 0
+   number = 0
+   speed = 0
    x_pos = 0.0
    y_pos = 0.0
    z_pos = 0.0
@@ -49,7 +55,7 @@ class Car:
    last_recv_time = None
 
    def __init__(self, num, x, y, z):
-      self.carNumber = num
+      self.number = num
       self.x_pos = x
       self.y_pos = y
       self.z_pos = z
@@ -64,7 +70,7 @@ class Car:
       return '{:013.6f}'.format(val)
 
    def send_data(self):
-      data_str = 'Car Number: ' + str(self.carNumber) + ' Speed:-01,Gear:-01,PX:' + self.format_num(self.x_pos) + ',PY:' + \
+      data_str = 'Car Number: ' + str(self.number) + ', Speed: ' + str(car.speed) + ', Gear:-01,PX:' + self.format_num(self.x_pos) + ',PY:' + \
          self.format_num(self.y_pos) + ',PZ:' + self.format_num(self.z_pos) + \
          ',OW:-0.000000,OX:-0.000000,OY:-0.000000,OZ:-0.000000' + '\r'
       num_bytes = self.sock.send(data_str.encode())
@@ -111,7 +117,7 @@ time.sleep(0.050)
 
 for i in range(int(num_cars)):
    car = Car(i, start_x, start_y, 0.0)
-   start_x += 10
+   start_x += 20
    start_y += 0
    car.init_socket('', 4001)
    car.send_data()

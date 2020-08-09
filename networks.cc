@@ -476,20 +476,36 @@ int removeCar(struct CarBuffer *carBuffer, int carNumber){
 	return 0;
 }
 
+void printCarList(struct CarBuffer *list) {
+	// For debugging purposes
+	if (list->buffer != NULL) {
+		printCars(list->buffer);
+	}
+}
+
+void printCars(struct Car *car) {
+	// Helper function for printLinkedList
+	printf("%d -> ", car->carNumber);
+	if (car->nextCar == NULL) {
+		printf("NULL\n");
+	}
+	else {
+		printCars(car->nextCar);
+	}
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helper Functions (Works for Now) WIP
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void handlePacket(struct CarBuffer *carBuffer, int socketNumber, char *payload) {
 	char buf[PAYLOADSIZE];
 
-	if (findCar(carBuffer, socketNumber) == 0){
+	if (findCar(carBuffer, socketNumber) == 0) {
 		initCar(carBuffer, socketNumber, atoi(&payload[12]), payload);
 		carBuffer->bufferSize++;
 	}else{
 		updateCar(carBuffer->buffer, socketNumber, payload);
 	}
-	getCarPayload(carBuffer->buffer, 0, buf);
-	//printf("Payload: %s\n", buf);
 }
 
 void addNewClient(int mainServerSocket){
