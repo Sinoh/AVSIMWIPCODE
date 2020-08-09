@@ -45,6 +45,9 @@
 #define MAXPACKETLEN 200
 #define POLL_SET_SIZE 10
 #define POLL_WAIT_FOREVER -1
+#define PAYLOADSIZE 1024
+#define PORTNUMBER 4001
+#define MAXCARS 2
 
 struct Node{
     int socketNumber;
@@ -60,7 +63,19 @@ struct Node{
 struct LinkedList{
     int listSize;
     int simSocket;
-    struct Node *root; 
+    struct Node *root;
+};
+
+struct Car {
+    int socketNumber;
+    int carNumber;
+    char payload[PAYLOADSIZE];
+    struct Car *nextCar;
+};
+
+struct CarBuffer {
+    int bufferSize;
+    struct Car *buffer;
 };
 
 void printBytes(char *PDU);
@@ -77,34 +92,21 @@ void addToPollSet(int socketNumber);
 void removeFromPollSet(int socketNumber);
 int pollCall(int timeInMilliSeconds);
 
-void createPDU(char *buffer, int carNumber, int flag, char *data);
-int connectToServer();
-int disconnectFromServer(int socketNumber);
-int getCarSpeed(struct LinkedList *list, int carNumber);
-int getCarPosX(struct LinkedList *list, int carNumber);
-int getCarPosY(struct LinkedList *list, int carNumber);
-int getCarPosZ(struct LinkedList *list, int carNumber);
-
-
-void handlePacket(char* buffer, struct LinkedList *list, int clientsocket);
-void handleRequests(char* buffer, struct LinkedList *list, int clientSocket);
 void addNewClient(int mainServerSocket);
-void removeClient(int clientSocket);
-void recvFromClient(int clientSocket, struct LinkedList *list);
+void removeClient(int clientSocket, struct CarBuffer *carBuffer);
+void recvFromClient(int clientSocket, struct CarBuffer *list);
 void processSockets(int mainServerSocket, struct LinkedList *list);
-void *initialize(void *input);
-struct LinkedList *startSwitch();
+void handlePacket(struct CarBuffer *carBuffer, int socketNumber, char *payload);
 
-struct LinkedList *initLinkedList();
-void addNode(struct LinkedList *list, int carNumber, int socketNumber);
-int getListLength(struct Node *node);
-void removeNode(struct LinkedList *list, int socketNumber);
-struct Node *removeNodeHelper(struct Node *node, int socketNumber);
-struct Node *findCar(struct LinkedList *list, int carNumber);
-void printLinkedList(struct LinkedList *list);
-void printNode(struct Node *node);
-void printSocketNumber(struct Node* node);
-void handleRequests(char* buffer, struct LinkedList *list, int clientSocket);
+void initCar(struct CarBuffer *carBuffer, int socketNumber, int carNumberm, char *payload);
+struct CarBuffer *initCarBuffer();
+void updateCar(struct Car *carList, int socketNumber, char *payload);
+int getCarPayload(struct Car *carList, int carNumber, char *payload);
+int removeCar(struct CarBuffer *carBuffer, int carNumber);
+struct Car *findCar(struct CarBuffer *carBuffer, int socketNumber);
+struct Car *addCar(struct Car *carList, struct Car * car);
 
-void printPosX(struct Node* node);
+
+void *initServer(void *input);
+struct CarBuffer *startSwitch();
 #endif
