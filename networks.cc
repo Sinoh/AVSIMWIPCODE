@@ -274,9 +274,9 @@ static void growPollSet(int newSetSize)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helper Functions (Structure) to hold clients (Completed)
+// Helper Functions (Structure) to hold clients (Completed) (No longer being used)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/*
 struct LinkedList *initLinkedList(){
 	struct LinkedList *list = (struct LinkedList*)malloc(sizeof(struct LinkedList));
 	list->listSize = 0;
@@ -394,63 +394,103 @@ void updateNode(LinkedList *list, int carNumber, int posX, int posY, int posZ, i
 	}
 
 }
+*/
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Helper Functions (New Struct to hold Data) WIP
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void initCar(struct CarBuffer *carBuffer, int socketNumber, int carNumber, char *payload){
+	struct Car *car = (struct Car*)sCalloc(1, sizeof(struct Car));
+	car->socketNumber = socketNumber;
+	car->carNumber = carNumber;
+	memset(car->payload, 0, PAYLOADSIZE);
+	memcpy(car->payload, payload, PAYLOADSIZE);
+	car->nextCar = NULL;
+
+	carBuffer->buffer = addCar(carBuffer->buffer, car);
+}
+
+struct CarBuffer *initCarBuffer(){
+	struct CarBuffer *carBuffer = (struct CarBuffer*)malloc(sizeof(struct CarBuffer));
+	carBuffer->bufferSize = 0;
+	carBuffer->buffer = NULL;
+
+	return carBuffer;
+}
+
+struct Car *addCar(struct Car *carList, struct Car * car){
+	if (carList != NULL) {
+		carList->nextCar = addCar(carList->nextCar, car);
+		return carList;
+	}
+	return car;
+
+}
+
+struct Car *findCar(struct CarBuffer *carBuffer, int socketNumber) {
+	struct Car *tempCar = carBuffer->buffer;
+	while (tempCar != NULL) {
+		if (socketNumber == tempCar->socketNumber) {
+			return tempCar;
+		}
+		tempCar = tempCar->nextCar;
+	}
+	return 0;
+}
+
+void updateCar(struct Car *carList, int socketNumber, char *payload) {
+	if (carList->socketNumber != socketNumber) {
+		updateCar(carList->nextCar, socketNumber, payload);
+	}
+	else {
+		memset(carList->payload, 0, PAYLOADSIZE);
+		memcpy(carList->payload, payload, PAYLOADSIZE);
+	}
+}
+
+int getCarPayload(struct Car *carList, int carNumber, char *payload) {
+	if (carList == NULL){
+		return 0;
+	}else if (carList->carNumber != carNumber) {
+		return getCarPayload(carList->nextCar, carNumber, payload);
+	}else{
+		memset(payload, 0, PAYLOADSIZE);
+		memcpy(payload, carList->payload, PAYLOADSIZE);
+		return 1;
+	}
+}
+
+int removeCar(struct CarBuffer *carBuffer, int carNumber){
+	int i;
+
+	for (i = 0; i < carBuffer->bufferSize; i++) {
+		if (carBuffer->buffer[i].carNumber == carNumber) {
+			memset(carBuffer->buffer[i].payload, 0, PAYLOADSIZE);
+			carBuffer->buffer[i].carNumber = -1;
+			carBuffer->buffer[i].socketNumber = -1;
+			return 1;
+		}
+	}
+
+	return 0;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helper Functions (Works for Now) WIP
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void handlePacket(char* buffer, struct LinkedList *list, int clientsocket){
+void handlePacket(struct CarBuffer *carBuffer, int socketNumber, char *payload) {
+	char buf[PAYLOADSIZE];
 
-	//printf("BufferLen: %i from socket: %i\n", strlen(buffer), clientsocket);
-	//printf("Message Recv: %s\n", buffer);
-	// if (strlen(buffer) < 6){
-	// 	printf("Handling Request\n");
-	// 	handleRequests(buffer, list, clientsocket);
-	// }else{
-	if (findCar(list, atoi(&buffer[12])) == 0){
-		addNode(list, atoi(&buffer[12]), clientsocket);
+	if (findCar(carBuffer, socketNumber) == 0){
+		initCar(carBuffer, socketNumber, atoi(&payload[12]), payload);
+		carBuffer->bufferSize++;
+	}else{
+		updateCar(carBuffer->buffer, socketNumber, payload);
 	}
-	updateNode(list, atoi(&buffer[12]), atoi(&buffer[42]), atoi(&buffer[58]), 0, 0);
-	//}
-
+	getCarPayload(carBuffer->buffer, 0, buf);
+	//printf("Payload: %s\n", buf);
 }
-
-// Not in use right now
-/*
-void handleRequests(char* buffer, struct LinkedList *list, int clientSocket){
-	struct Node *car;
-	char sendBuf[5];
-	char data[1];
-	int carNumber =  atoi(&buffer[2]);
-	int flag = atoi(&buffer[3]);
-
-	if ((car = findCar(list, carNumber)) == 0){
-	}
-
-	switch(flag)
-	{
-		case 0:
-			list->simSocket = clientSocket;
-		case 1:
-			memcpy(data, &car->carSpeed, 1);
-		case 2:
-			memcpy(data, &car->carPosX, 1);
-		case 3:
-			memcpy(data, &car->carPosY, 1);
-		case 4:
-			memcpy(data, &car->carPosZ, 1);
-		default:
-			memset(data, 0, 1);
-			flag = -1;
-	}
-
-	createPDU(sendBuf, carNumber, flag, data);
-	safeSend(clientSocket, sendBuf, 5);
-
-
-}
-*/
-
 
 void addNewClient(int mainServerSocket){
 	int newClientSocket = tcpAccept(mainServerSocket, DEBUG_FLAG);
@@ -458,29 +498,29 @@ void addNewClient(int mainServerSocket){
 	addToPollSet(newClientSocket);
 }
 
-void removeClient(int clientSocket){
+void removeClient(int clientSocket, struct CarBuffer *carBuffer){
 	printf("Client on socket %d terminted\n", clientSocket);
 	removeFromPollSet(clientSocket);
 	close(clientSocket);
 }
 
-void recvFromClient(int clientSocket, struct LinkedList *list){
-	char buf[MAXBUF];
-	memset(&buf, 0, MAXBUF);
+void recvFromClient(int clientSocket, struct CarBuffer *carBuffer) {
+	char buf[PAYLOADSIZE];
+	memset(&buf, 0, PAYLOADSIZE);
+
 	if (safeRecv(clientSocket, buf, MSG_DONTWAIT) != 0){
 		if (strlen(buf) != 0){
-			handlePacket(buf, list, clientSocket);
-		}else{
-			printBytes(buf);
-			printf("Removing Client\n");
-			removeClient(clientSocket);
+			//printf("Message Recv: %s\n", buf);
+			handlePacket(carBuffer, clientSocket, (char *) buf);
+		}else {
+			removeClient(clientSocket, carBuffer);
 		}
 
 
 	}
 }
 
-void processSockets(int mainServerSocket, struct LinkedList *list){
+void processSockets(int mainServerSocket, struct CarBuffer *carBuffer){
 
 	int socketToProcess = 0;
 
@@ -490,131 +530,30 @@ void processSockets(int mainServerSocket, struct LinkedList *list){
 			if (socketToProcess == mainServerSocket){
 				addNewClient(mainServerSocket);
 			}else{
-				recvFromClient(socketToProcess, list);
+				recvFromClient(socketToProcess, carBuffer);
 			}
 		}
 	}
 }
 
-void *initialize(void *input){
+
+void *initServer(void *input){
 	int mainServerSocket = 0;   //socket descriptor for the server socket
-	int portNumber = 4001;
+	int portNumber = PORTNUMBER;
 
-    mainServerSocket = tcpServerSetup(portNumber);
+	mainServerSocket = tcpServerSetup(PORTNUMBER);
 
-	processSockets(mainServerSocket, (struct LinkedList *)input);
+	processSockets(mainServerSocket, (struct CarBuffer *)input);
 	close(mainServerSocket);
 
 	return NULL;
-
 }
 
-struct LinkedList *startSwitch(){
-	struct LinkedList *list = initLinkedList();
+struct CarBuffer *startSwitch(){
+	struct CarBuffer *carBuffer = initCarBuffer();
 	pthread_t thread_id;
-	pthread_create(&thread_id, NULL, initialize, list);
+	pthread_create(&thread_id, NULL, initServer, carBuffer);
 
-	return list;
-}
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helper Functions (Car) WIP
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/*
-void createPDU(char *buffer, int carNumber, int flag, char *data){
-
-	int bufferSize = 4;
-	uint16_t PDUSize;
-	u_int16_t formatedPDUSize;
-	switch(flag){
-		case 0:
-			PDUSize = bufferSize;
-			formatedPDUSize = htons(PDUSize);
-		default:
-			PDUSize = bufferSize + strlen(data);
-			formatedPDUSize = htons(PDUSize);
-	}
-
-	memset(buffer, 0, bufferSize);
-	memcpy(buffer, &formatedPDUSize, 2);
-	memcpy(buffer + 2, &carNumber, 1);
-	memcpy(buffer + 3, &flag, 1);
-	memcpy(buffer + 4, data, strlen(data));
+	return carBuffer;
 }
 
-int connectToServer(){
-	int socketNumber = -1;
-	char buffer[4];
-	char *serverName = "0.0.0.0";
-	char *portNumber = "4001";
-
-
-    puts("Attempt to Connect\n");
-	socketNumber = tcpClientSetup(serverName, portNumber, 0);
-    puts("Connected\n");
-	createPDU(buffer, 99, 0, "");
-	safeSend(socketNumber, buffer, 4);
-    printf("SocketNumber: %i\n", socketNumber);
-	return socketNumber;
-}
-
-int disconnectFromServer(int socketNumber){
-	close(socketNumber);
-}
-
-int getCarSpeed(int carNumber, int socketNumber){
-	char buffer[4];
-	char recvBuffer[5];
-
-	createPDU(buffer, carNumber, 1, "");
-	safeSend(socketNumber, buffer, 4);
-	sleep(1);
-	safeRecv(socketNumber, recvBuffer, MSG_DONTWAIT);
-	return atoi(&recvBuffer[4]);
-}
-
-int getCarPosX(int carNumber, int socketNumber){
-	char buffer[4];
-	char recvBuffer[5];
-
-	createPDU(buffer, carNumber, 2, "");
-	safeSend(socketNumber, buffer, 4);
-    return 0;
-}
-
-int getCarPosY(int carNumber, int socketNumber){
-	char buffer[4];
-	createPDU(buffer, carNumber, 3, "");
-	safeSend(socketNumber, buffer, 4);
-	sleep(1);
-}
-
-int getCarPosZ(int carNumber, int socketNumber){
-
-	char buffer[4];
-	createPDU(buffer, carNumber, 4, "");
-	safeSend(socketNumber, buffer, 4);
-	sleep(1);
-}
-
-*/
-
-int getCarSpeed(struct LinkedList *list, int carNumber){
-	struct Node* car = findCar(list, carNumber);
-	return car->carSpeed;
-}
-
-int getCarPosX(struct LinkedList *list, int carNumber){
-	struct Node* car = findCar(list, carNumber);
-	return car->carPosX;
-}
-
-int getCarPosY(struct LinkedList *list, int carNumber){
-	struct Node* car = findCar(list, carNumber);
-	return car->carPosY;
-}
-
-int getCarPosZ(struct LinkedList *list, int carNumber){
-	struct Node* car = findCar(list, carNumber);
-	return car->carPosZ;
-}

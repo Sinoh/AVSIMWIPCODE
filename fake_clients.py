@@ -5,12 +5,13 @@ import threading
 import errno
 from datetime import datetime
 
-
 def drive(car):
    while True:
       car.receive_data()
       if not pause:
          car.send_data()
+
+      car.x_pos += 1
       start = datetime.now()
       time.sleep(0.1)
       end = datetime.now()
@@ -36,8 +37,9 @@ def watchForCommand():
       else:
          print(data)
          assert(False)
-   
+
 class Car:
+   carNumber = 0
    x_pos = 0.0
    y_pos = 0.0
    z_pos = 0.0
@@ -45,7 +47,8 @@ class Car:
    sock = None
    last_recv_time = None
 
-   def __init__(self, x, y, z):
+   def __init__(self, num, x, y, z):
+      self.carNumber = num
       self.x_pos = x
       self.y_pos = y
       self.z_pos = z
@@ -60,7 +63,7 @@ class Car:
       return '{:013.6f}'.format(val)
 
    def send_data(self):
-      data_str = 'Speed:-01,Gear:-01,PX:' + self.format_num(self.x_pos) + ',PY:' + \
+      data_str = 'Car Number: ' + str(self.carNumber) + ' Speed:-01,Gear:-01,PX:' + self.format_num(self.x_pos) + ',PY:' + \
          self.format_num(self.y_pos) + ',PZ:' + self.format_num(self.z_pos) + \
          ',OW:-0.000000,OX:-0.000000,OY:-0.000000,OZ:-0.000000' + '\r'
       num_bytes = self.sock.send(data_str.encode())
@@ -106,9 +109,9 @@ threads.append(thread)
 time.sleep(0.050)
 
 for i in range(int(num_cars)):
-   car = Car(start_x, start_y, 0.0)
-   #start_x += 10
-   #start_y += 10
+   car = Car(i, start_x, start_y, 0.0)
+   start_x += 10
+   start_y += 0
    car.init_socket('', 4001)
    car.send_data()
    cars.append(car)
