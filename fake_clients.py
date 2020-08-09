@@ -5,6 +5,7 @@ import threading
 import errno
 from datetime import datetime
 
+
 def drive(car):
    while True:
       car.receive_data()
