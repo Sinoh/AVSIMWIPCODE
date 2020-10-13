@@ -1,3 +1,15 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+
+#include "AirSimConnect-helper.h"
+
+namespace ns3 {
+
+/* ... */
+
+
+}
+
+
 
 
 #include "networks.h"
@@ -92,7 +104,7 @@ int tcpAccept(int server_socket, int debugFlag)
 int tcpClientSetup(char * serverName, char * port, int debugFlag)
 {
 	int socket_num;
-	uint8_t * ipAddress = NULL;
+	//uint8_t * ipAddress = NULL;
 	struct sockaddr_in6 server;
 
 	// create the socket
@@ -132,7 +144,7 @@ void safeSend(int socketNumber, char *buffer, int bufferSize)
 // Also copies received data into a give buffer
 
 int safeRecv(int socketNumber, char *buffer, int flag){
-	uint16_t bufferLength = 0;
+	//uint16_t bufferLength = 0;
 
 	if (recv(socketNumber, buffer, 1024, flag) < 0){
 		perror("recv call");
@@ -499,13 +511,16 @@ void printCars(struct Car *car) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void handlePacket(struct CarBuffer *carBuffer, int socketNumber, char *payload) {
 	char buf[PAYLOADSIZE];
+	memset(buf, 1, 1);
+	// if (findCar(carBuffer, socketNumber) == 0) {
+	// 	initCar(carBuffer, socketNumber, atoi(&payload[12]), payload);
+	// 	carBuffer->bufferSize++;
+	// }else{
+	// 	updateCar(carBuffer->buffer, socketNumber, payload);
+	// }
 
-	if (findCar(carBuffer, socketNumber) == 0) {
-		initCar(carBuffer, socketNumber, atoi(&payload[12]), payload);
-		carBuffer->bufferSize++;
-	}else{
-		updateCar(carBuffer->buffer, socketNumber, payload);
-	}
+	//printf("Message: %s\n", carBuffer);
+	safeSend(socketNumber, buf, 1);
 }
 
 void addNewClient(int mainServerSocket){
@@ -525,8 +540,8 @@ void recvFromClient(int clientSocket, struct CarBuffer *carBuffer) {
 	memset(&buf, 0, PAYLOADSIZE);
 
 	if (safeRecv(clientSocket, buf, MSG_DONTWAIT) != 0){
+		printf("Message Recv: %s\n", buf);
 		if (strlen(buf) != 0){
-			//printf("Message Recv: %s\n", buf);
 			handlePacket(carBuffer, clientSocket, (char *) buf);
 		}else {
 			removeClient(clientSocket, carBuffer);
@@ -555,7 +570,7 @@ void processSockets(int mainServerSocket, struct CarBuffer *carBuffer){
 
 void *initServer(void *input){
 	int mainServerSocket = 0;   //socket descriptor for the server socket
-	int portNumber = PORTNUMBER;
+	//int portNumber = PORTNUMBER;
 
 	mainServerSocket = tcpServerSetup(PORTNUMBER);
 
@@ -572,4 +587,6 @@ struct CarBuffer *startSwitch(){
 
 	return carBuffer;
 }
+
+
 
