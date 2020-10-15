@@ -15,6 +15,8 @@ main (int argc, char *argv[])
   cmd.AddValue ("verbose", "Tell application to log if true", verbose);
 
   cmd.Parse (argc,argv);
+  
+  initialize();
 
   /* ... */
 
