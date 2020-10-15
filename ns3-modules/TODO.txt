@@ -12,7 +12,7 @@ My current goal is to get three functions to be usable in the ns3 program.
 
 Function headers:
 
-    voidinitialize(struct CarBuffer *car);
+    void initialize(struct CarBuffer *buffer);
     struct CarBuffer *initCarBuffer();
     int getCarPayload(struct Car *carList, int carNumber, char *payload);
 
