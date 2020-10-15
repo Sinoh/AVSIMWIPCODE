@@ -473,12 +473,9 @@ void *initServer(void *input){
 // Note: This does not handle connecting to two programs that connects to the sockets
 // IE: Running 1 fake_clients.py at a time is fine, but no more
 // The car "number" needs to be handled correctly outside of this program, so there are no duplicates
-struct CarBuffer *startSwitch(){
-	struct CarBuffer *carBuffer = initCarBuffer();
+void startSwitch(struct CarBuffer *carBuffer){
 	pthread_t thread_id;
 	pthread_create(&thread_id, NULL, initServer, carBuffer);
-
-	return carBuffer;
 }
 
 

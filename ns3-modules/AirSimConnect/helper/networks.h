@@ -87,7 +87,7 @@ void printCars(struct Car *car);
 void printCarList(struct CarBuffer *list);
 
 void *initServer(void *input);
-struct CarBuffer *startSwitch();
+void startSwitch(struct CarBuffer *carBuffer);
 #endif
 
 

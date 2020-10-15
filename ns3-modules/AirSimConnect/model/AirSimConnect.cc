@@ -8,7 +8,8 @@ namespace ns3 {
 bool initialize()
 {
     int i;
-    struct CarBuffer *buffer = startSwitch();
+    struct CarBuffer *buffer = initCarBuffer();
+    startSwitch(buffer);
     char payload[PAYLOADSIZE];
     while(buffer->flag){
         sleep(1);
