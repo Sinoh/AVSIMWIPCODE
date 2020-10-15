@@ -1,7 +1,7 @@
 
-// #ifdef __cplusplus 
-// extern "C" {
-// #endif
+#ifdef __cplusplus 
+extern "C" {
+#endif
 
 #ifndef __NETWORKS_H__
 #define __NETWORKS_H__
@@ -31,20 +31,6 @@
 #define TIME_IS_NULL 1
 #define TIME_IS_NOT_NULL 2
 
-#define FLAG1 1
-#define FLAG2 2
-#define FLAG3 3
-#define FLAG4 4
-#define FLAG5 5
-#define FLAG6 6
-#define FLAG7 7
-#define FLAG8 8
-#define FLAG9 9
-#define FLAG10 10
-#define FLAG11 11
-#define FLAG12 12
-#define FLAG13 13
-
 #define CHATHEDAERSIZE 3
 #define MAXNAMELEN 100
 #define MAXPACKETLEN 200
@@ -53,23 +39,8 @@
 #define PAYLOADSIZE 1024
 #define PORTNUMBER 4001
 #define MAXCARS 2
+#define COUNT_LIMIT 20
 
-struct Node{
-    int socketNumber;
-    int carNumber;
-    int carPosX;
-    int carPosY;
-    int carPosZ;
-    int carSpeed;
-
-    struct Node *next;
-};
-
-struct LinkedList{
-    int listSize;
-    int simSocket;
-    struct Node *root;
-};
 
 struct Car {
     int socketNumber;
@@ -79,6 +50,7 @@ struct Car {
 };
 
 struct CarBuffer {
+    int flag;
     int bufferSize;
     struct Car *buffer;
 };
@@ -103,11 +75,11 @@ void recvFromClient(int clientSocket, struct CarBuffer *list);
 void processSockets(int mainServerSocket, struct CarBuffer *carBuffer);
 void handlePacket(struct CarBuffer *carBuffer, int socketNumber, char *payload);
 
-void initCar(struct CarBuffer *carBuffer, int socketNumber, int carNumberm, char *payload);
+struct Car *initCar(struct CarBuffer *carBuffer, int socketNumber, int carNumber, char *payload);
 struct CarBuffer *initCarBuffer();
 void updateCar(struct Car *carList, int socketNumber, char *payload);
 int getCarPayload(struct Car *carList, int carNumber, char *payload);
-int removeCar(struct CarBuffer *carBuffer, int carNumber);
+struct Car *removeCar(int SocketNumber, struct Car *car, struct CarBuffer *carBuffer);
 struct Car *findCar(struct CarBuffer *carBuffer, int socketNumber);
 struct Car *addCar(struct Car *carList, struct Car * car);
 
@@ -118,6 +90,7 @@ void *initServer(void *input);
 struct CarBuffer *startSwitch();
 #endif
 
-// #ifdef __cplusplus 
-// }
-// #endif
+
+#ifdef __cplusplus 
+}
+#endif
