@@ -4,13 +4,6 @@
 
 namespace ns3 {
 
-/* ... */
-
-
-}
-
-
-
 // For DEBUG purposes only. Prints every byte in a buffer in Hex, Num, and Char
 void printBytes(char *PDU){
 	int i;
@@ -283,11 +276,6 @@ static void growPollSet(int newSetSize)
 }
 
 
-
-
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -458,7 +446,6 @@ void processSockets(int mainServerSocket, struct CarBuffer *carBuffer){
 	carBuffer->flag = 0;
 }
 
-
 void *initServer(void *input){
 	int mainServerSocket = 0;   //socket descriptor for the server socket
 
@@ -470,14 +457,4 @@ void *initServer(void *input){
 	return NULL;
 }
 
-// Note: This does not handle connecting to two programs that connects to the sockets
-// IE: Running 1 fake_clients.py at a time is fine, but no more
-// The car "number" needs to be handled correctly outside of this program, so there are no duplicates
-void startSwitch(struct CarBuffer *carBuffer){
-	pthread_t thread_id;
-	pthread_create(&thread_id, NULL, initServer, carBuffer);
 }
-
-
-
-

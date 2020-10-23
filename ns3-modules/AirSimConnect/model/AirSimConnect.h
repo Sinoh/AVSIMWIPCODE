@@ -5,9 +5,7 @@
 #include "ns3/AirSimConnect-helper.h"
 
 namespace ns3 {
-
-bool initialize();
-
+struct CarBuffer *initialize();
 }
 
 #endif /* AIRSIMCONNECT_H */
