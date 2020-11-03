@@ -3,6 +3,7 @@
 #define AIRSIMCONNECT_H
 
 #include "ns3/AirSimConnect-helper.h"
+#include "ns3/Networks-helper.h"
 
 namespace ns3 {
 struct CarBuffer *initialize();
