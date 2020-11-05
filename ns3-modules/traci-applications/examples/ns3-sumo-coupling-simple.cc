@@ -80,7 +80,7 @@ main (int argc, char *argv[])
   AirSimClient->SetAttribute ("SynchInterval", TimeValue (Seconds (0.1)));
   AirSimClient->SetAttribute ("StartTime", TimeValue (Seconds (0.0)));
   // AirSimClient->SetAttribute ("SumoGUI", BooleanValue (false));
-  AirSimClient->SetAttribute ("SumoPort", UintegerValue (4001));
+  AirSimClient->SetAttribute ("AirSimPort", UintegerValue (4001));
   AirSimClient->SetAttribute ("PenetrationRate", DoubleValue (1.0));  // portion of vehicles equipped with wifi
   // AirSimClient->SetAttribute ("SumoLogFile", BooleanValue (true));
   // AirSimClient->SetAttribute ("SumoStepLog", BooleanValue (false));

@@ -29,6 +29,8 @@
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include "ns3/core-module.h"
+
 
 #include "traci-client.h"
 
@@ -52,14 +54,14 @@ namespace ns3
     //               StringValue (""),
     //               MakeStringAccessor (&TraciClient::m_sumoBinaryPath),
     //               MakeStringChecker ())
-    .AddAttribute ("SumoPort",
+    .AddAttribute ("AirSimPort",
                   "Port on which SUMO/Traci is listening for connection.",
                   UintegerValue (4001),
                   MakeUintegerAccessor (&TraciClient::m_sumoPort),
                   MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("SumoWaitForSocket",
+    .AddAttribute ("AirSimWaitForSocket",
                   "Wait XX sec (=1e6 microsec) until sumo opens socket for traci connection.",
-                  TimeValue (ns3::Seconds(1.0)),
+                  TimeValue (ns3::Seconds(8.0)),
                   MakeTimeAccessor (&TraciClient::m_sumoWaitForSocket),
                   MakeTimeChecker ())
     // .AddAttribute ("SumoGUI",
@@ -88,12 +90,12 @@ namespace ns3
     //               MakeBooleanChecker ())
     .AddAttribute ("SynchInterval",
                   "Time interval for synchronizing the two simulators.",
-                  TimeValue (ns3::Seconds(1.0)),
+                  TimeValue (ns3::Seconds(10.0)),
                   MakeTimeAccessor (&TraciClient::m_synchInterval),
                   MakeTimeChecker ())
     .AddAttribute ("StartTime",
                   "Start time of SUMO simulator; Offset time between ns3 and sumo simulation.",
-                  TimeValue (ns3::Seconds(10.0)),
+                  TimeValue (ns3::Seconds(5.0)),
                   MakeTimeAccessor (&TraciClient::m_startTime),
                   MakeTimeChecker ())
     .AddAttribute ("PenetrationRate", "Rate of vehicles, equipped with wireless communication devices",
@@ -225,6 +227,20 @@ namespace ns3
     return m_sumoCommand;
   }
 
+  void TraciClient::connectToPort(int port){
+  
+    // connect to airSim via traci
+    try
+      {
+        this->TraCIAPI::connect("localhost", port);
+      }
+    catch (std::exception& e)
+      {
+        NS_FATAL_ERROR("Can not connect to sumo via traci: " << e.what());
+      }
+
+  }
+
   void
   TraciClient::SumoSetup(std::function<Ptr<Node>()> includeNode, std::function<void (Ptr<Node>)> excludeNode)
   {
@@ -301,22 +317,35 @@ namespace ns3
       }
 
     // start sumo and simulate until the specified time
-    std::cout << "Starting fake clients and simulate until " << m_startTime.GetSeconds();
-    this->TraCIAPI::testSimulationStep(m_startTime.GetSeconds());
+    // std::cout << "Starting fake clients and simulate until " << m_startTime.GetSeconds();
 
-    std::cout << "Finished simulationStep, now going to testSynchroniseVehicleNodeMap -> here need to add to map";
+
+    // this->TraCIAPI::testSimulationStep(m_startTime.GetSeconds());
+
+
+
+
+    // std::cout << "Finished simulationStep in setup\n Now scheduling test simulation\n";
 
 
     // synchronise sumo vehicles with ns3 nodes
     // SynchroniseVehicleNodeMap();
 
-    // std::cout << "Finished synchroniseVehicleNodeMap, now going to updatePositions";
+    // std::cout << "scheduling testSumoSimulation at" << m_synchInterval.GetSeconds() << "s and I am at" << Simulator::Now().GetSeconds() << "\n";
 
     // get current positions from sumo and uptdate positions
     // UpdatePositions();
 
+    ns3::Time checkTime = ns3::MilliSeconds(1);
+    ns3::Time expireTime = Simulator::Now() + m_synchInterval;
+
+    std::cout << "scheduling checkIfReceived at" << checkTime.GetSeconds() << "s and I am at" << Simulator::Now().GetSeconds() << " with expiration of " << expireTime.GetSeconds() <<"\n" ;
+
+
+    Simulator::Schedule(checkTime, &TraciClient::checkIfReceived, this, expireTime);
+
     // schedule event to command sumo the next simulation step
-    Simulator::Schedule(m_synchInterval, &TraciClient::testSumoSimulationStep, this);
+    // Simulator::Schedule(m_synchInterval, &TraciClient::testSumoSimulationStep, this);
   }
 
   void
@@ -347,6 +376,11 @@ namespace ns3
       }
   }
 
+  // void
+  // TraciClient::doNow(){
+
+  // }
+
   void
   TraciClient::testSumoSimulationStep()
   {
@@ -355,11 +389,28 @@ namespace ns3
 
     try
       {
+        auto curr = Simulator::Now().GetSeconds();
+        std::cout << "goinginto while!";
+
+        while (curr == 2){
+          std::cout << "in testSumoSimulationStep 1!";
+          usleep(1000000);
+          curr = Simulator::Now().GetSeconds();
+        }
+        std::cout << "new curr " << curr << "\n\n";
+
         // get current simulation time
         auto nextTime = Simulator::Now().GetSeconds() + m_synchInterval.GetSeconds() + m_startTime.GetSeconds();
 
-        // command sumo to simulate next time step
+        std::cout << "Telling test clients to simulate next time step at " << nextTime << " because our synch Interval is " << m_synchInterval.GetSeconds() << "and startTime= " <<  m_startTime.GetSeconds();
+
+        std::cout << "\nNow: " << curr << "\n";
+        // // command sumo to simulate next time step
+        // usleep(10);
         this->TraCIAPI::testSimulationStep(nextTime);
+
+        // command sumo to simulate next time step
+        // this->TraCIAPI::testSimulationStep(nextTime);
 
         // include a ns3 node for every new sumo vehicle and exclude arrived vehicles
         // SynchroniseVehicleNodeMap();
@@ -368,7 +419,7 @@ namespace ns3
         // UpdatePositions();
 
         // schedule next event to simulate next time step in sumo
-        Simulator::Schedule(m_synchInterval, &TraciClient::testSumoSimulationStep, this);
+        // Simulator::Schedule(m_synchInterval, &TraciClient::testSumoSimulationStep, this);
       }
     catch (std::exception& e)
       {

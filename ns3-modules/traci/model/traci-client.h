@@ -58,6 +58,9 @@ public:
 
   void SumoStop();
 
+  void connectToPort(int port);
+
+
   // get associated sumo vehicle for ns3 node
   std::string GetVehicleId(Ptr<Node> node);
 

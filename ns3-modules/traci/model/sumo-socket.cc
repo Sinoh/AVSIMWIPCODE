@@ -75,7 +75,7 @@ namespace tcpip
 		port_( port ),
 		socket_(-1),
 		server_socket_(-1),
-		blocking_(true),
+		blocking_(false),
 		verbose_(false)
 	{
 		init();
@@ -88,7 +88,7 @@ namespace tcpip
 		port_( port ),
 		socket_(-1),
 		server_socket_(-1),
-		blocking_(true),
+		blocking_(false),
 		verbose_(false)
 	{
 		init();
@@ -307,6 +307,7 @@ namespace tcpip
 
 			// Make the newly created socket blocking or not
 			set_blocking(blocking_);
+      std::cout << "Created the socket blocking to be: " << blocking_;
 		}
 
 		socket_ = static_cast<int>(::accept(server_socket_, (struct sockaddr*)&client_addr, &addrlen));
@@ -331,6 +332,7 @@ namespace tcpip
 		set_blocking(bool blocking) 
 	{
 		blocking_ = blocking;
+    std::cout << "In set_blocking part1!!\n with server_socke = " << server_socket_;
 
 		if( server_socket_ > 0 )
 		{
@@ -347,6 +349,7 @@ namespace tcpip
 				arg |= O_NONBLOCK;
 			}
 			fcntl(server_socket_, F_SETFL, arg);
+      std::cout << "In set_blocking!!\n";
 #endif
 		}
 	
@@ -511,6 +514,7 @@ namespace tcpip
 
 		if( !datawaiting( socket_) )
 			return buffer;
+    std::cout << "In sumo socket receive";
 
 		buffer.resize(bufSize);
 		const size_t bytesReceived = recvAndCheck(&buffer[0], bufSize);

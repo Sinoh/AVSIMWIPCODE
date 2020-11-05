@@ -23,6 +23,15 @@
 // included modules
 // ===========================================================================
 #include "sumo-config.h"
+#include <unistd.h>
+
+#include <iostream>
+#include <fstream>
+#include <regex>
+#include <string>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include "ns3/core-module.h"
 
 #include "sumo-TraCIAPI.h"
 
@@ -74,6 +83,7 @@ void
 TraCIAPI::connect(const std::string& host, int port) {
     std::cout << "In connect with port" << port <<"\n";
     mySocket = new tcpip::Socket("localhost", port);
+    
     try {
         mySocket->connect();
     } catch (tcpip::SocketException&) {
@@ -129,7 +139,7 @@ TraCIAPI::send_commandSimulationStep(double time) const {
     outMsg.writeUnsignedByte(CMD_SIMSTEP);
     outMsg.writeDouble(time);
     // send request message
-    std::cout << "\nSENDING SIMULATION STEP MSG!in send_commandSimulationStep with time: " << time;
+    std::cout << "SENDING SIMULATION STEP MSG!in send_commandSimulationStep with time: " << time << "\n";
     mySocket->sendExact(outMsg);
 }
 
@@ -632,7 +642,8 @@ void
 TraCIAPI::simulationStep(double time) {
     send_commandSimulationStep(time);
     tcpip::Storage inMsg;
-    std::cout << "\n In simulationStep";
+    std::cout << "\n sent simulationStep; going to sleep";
+
 
     check_resultState(inMsg, CMD_SIMSTEP);
 
@@ -651,16 +662,39 @@ TraCIAPI::simulationStep(double time) {
     }
 }
 
+
+void
+TraCIAPI::checkIfReceived(ns3::Time expireTime) {
+  // check if data to read, if there is -> schedule broadcast
+  if (ns3::Simulator::Now() < expireTime){
+    ns3::Time checkTime = ns3::MilliSeconds(1);
+    ns3::Simulator::Schedule(checkTime, &TraCIAPI::checkIfReceived, this, expireTime);
+  }
+  else{
+    std::cout << "\nwe here command at " << ns3::Simulator::Now() << "\n";
+
+    ns3::Time checkTime = ns3::Minutes(3); // schedule any event in far future
+    ns3::Simulator::Schedule(checkTime, &TraCIAPI::checkIfReceived, this, expireTime);
+  }
+}
+
 void
 TraCIAPI::testSimulationStep(double time) {
     // send fakeClients msg asking for positions
-    send_commandSimulationStep(time);
-    tcpip::Storage inMsg;
-    
-    std::cout << "\nChecking msg result";
-    check_testResultState(inMsg, CMD_SIMSTEP);
+    std::cout << "\nsending command at " << time << "\n";
 
-    std::cout << "\n Finished check testResultState in testSimulationStep. Now done but need to add car to map\n";
+    send_commandSimulationStep(time);
+
+    // std::cout << "\nGoing to sleep sleeping";
+    // usleep(100);
+    // std::cout << "\nDone sleeping";
+    tcpip::Storage inMsg;
+
+    
+    // std::cout << "\nChecking msg result";
+    // check_testResultState(inMsg, CMD_SIMSTEP);
+
+    // std::cout << "\n Finished check testResultState in testSimulationStep. Now done but need to add car to map\n";
     // testReadInPackage(inMsg,)
 
     // for (auto it : myDomains) {

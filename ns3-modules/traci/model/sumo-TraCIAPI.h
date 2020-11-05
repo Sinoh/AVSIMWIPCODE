@@ -33,6 +33,7 @@
 #include "sumo-socket.h"
 #include "sumo-TraCIConstants.h"
 #include "sumo-TraCIDefs.h"
+#include "ns3/core-module.h"
 
 // ===========================================================================
 // global definitions
@@ -81,6 +82,8 @@ public:
     void simulationStep(double time = 0);
 
     void testSimulationStep(double time = 0);
+    void airSimTestSimulationStep(double time = 0);
+
 
 
     /// @brief Let sumo load a simulation using the given command line like options.
@@ -960,6 +963,8 @@ protected:
     void check_resultState(tcpip::Storage& inMsg, int command, bool ignoreCommandId = false, std::string* acknowledgement = 0) const;
 
     void check_testResultState(tcpip::Storage& inMsg, int command, bool ignoreCommandId = false, std::string* acknowledgement = 0) const;
+
+    void checkIfReceived(ns3::Time expireTime);
 
     /** @brief Validates the result state of a command
      * @return The command Id
