@@ -5,61 +5,83 @@
 #include "ns3/AirSimConnect.h"
 
 namespace ns3 {
+
 #define PAYLOADSIZE 1024
-class Packet{
-    int sequenceNumber;
-    int packetFlag;
-    int packetLength;
-    int speed;
-    int gear;
-    float posX;
-    float posY;
-    float posZ;
-    uint8_t *payload;
+class carData{
 
     public:
-        void updateSequenceNumber(int NewNumber){
-            this->sequenceNumber = NewNumber;
-        }
-        void updatePacketFlag(int NewFlag){
-            this->packetFlag = NewFlag;
-
-        }
-        void updatePacketLength(int NewLength){
-            this->packetLength = NewLength;
-        }
-        void updateSpeed(int NewSpeed){
-            this->speed = NewSpeed;
-        }
-        void updateGear(int NewGear){
-            this->gear = NewGear;
-        }
-        void updatePosX(int NewPosX){
-            this->posX = NewPosX;
-        }
-        void updatePosY(int NewPosY){
-            this->posY = NewPosY;
-        }
-        void updatePosZ(int NewPosZ){
-            this->posZ = NewPosZ;
-        }
-        void writePayload(){
-            uint32_t netOrdSequenceNumber = htonl(this->sequenceNumber);
-            memset(this->payload, 0, PAYLOADSIZE + 1);
-            memcpy(this->payload, &netOrdSequenceNumber, 4);
-            memcpy(this->payload + 6, &this->packetFlag, 1);
-	        memcpy(this->payload + 7, &this->packetLength, 1);
-            memcpy(this->payload + 8, &this->speed, 1);
-            memcpy(this->payload + 9, &this->gear, 1);
-            memcpy(this->payload + 10, &this->posX, 1);
-            memcpy(this->payload + 11, &this->posY, 1);
-            memcpy(this->payload + 12, &this->posZ, 1);
-        }
+        int sequenceNumber = 0;
+        int packetFlag = 0;
+        int Id = 0;
+        int packetLength = 21;
+        double speed = 0;
+        double gear = 0;
+        double posX = 0;
+        double posY = 0;
+        double posZ = 0;
+        char *payload;
+        void setData(int newSequenceNumber, int newPacketFlag, int newId, int newPacketLength, 
+                    double newSpeed, double newGear, double newPosX, double newPosY, double newPosZ);
+        int writePayload(char *buffer);
+        void createCarPacket();
+        void readCarPacket(char *packet);
+        /*
         uint8_t *getPayload(){
-            return payload;
+            return this->payload;
         }
-
+        int readSequenceNumber(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload, 4);
+            return buffer;
+        }
+        int readPacketFlag(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload + 4, 1);
+            return buffer;
+        }
+        int readPacketLength(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload + 5, 1);
+            return buffer;
+        }
+        int readSpeed(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload + 6, 1);
+            return buffer;
+        }
+        int readGear(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload + 7, 1);
+            return buffer;
+        }
+        int readPosX(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload + 8, 4);
+            return buffer;
+        }
+        int readPosY(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload + 12, 4);
+            return buffer;
+        }
+        int readPosZ(){
+            int buffer;
+            memset(&buffer, 0, sizeof(buffer));
+            memcpy(&buffer, this->payload + 16, 4);
+            return buffer;
+        }*/
 };
+
+
+void printBytes2(char *PDU);
+// void sendPacketToAirsim(int socketNumber, uint8_t *packet);
 }
 
 #endif

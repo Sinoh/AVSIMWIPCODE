@@ -35,7 +35,7 @@ namespace ns3 {
 #define POLL_WAIT_FOREVER -1
 #define PAYLOADSIZE 1024
 #define PORTNUMBER 4001
-#define COUNT_LIMIT 10
+#define COUNT_LIMIT 60
 
 void printBytes(char *PDU);
 int tcpServerSetup(int portNumber);

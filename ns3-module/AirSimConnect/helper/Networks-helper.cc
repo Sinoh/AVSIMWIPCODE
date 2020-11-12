@@ -7,15 +7,12 @@ namespace ns3 {
 // For DEBUG purposes only. Prints every byte in a buffer in Hex, Num, and Char
 void printBytes(char *PDU){
 	int i;
-	uint16_t length;
-	memcpy(&length, PDU, 2);
+	// uint16_t length;
+	// memcpy(&length, PDU, 2);
 
 	printf("\tHex\t|\tNum\t|\tChar\n");
-	for (i = 0; i < ntohs(length); i++){
+	for (i = 0; i < 100; i++){
 		printf("%i:\t%x\t|\t%i\t|\t%c\n", i, PDU[i] & 0xffff, PDU[i], PDU[i]);
-		if (i > 200){
-			return;
-		}
 	}
 }
 
@@ -322,7 +319,9 @@ void recvFromClient(int clientSocket, struct CarBuffer *carBuffer) {
 	memset(&buf, 0, PAYLOADSIZE);
 
 	if (safeRecv(clientSocket, buf, MSG_DONTWAIT) != 0){
-		if (strlen(buf) != 0){
+		printf("Checking buf size: %li\n", strlen(buf));
+		printBytes2(buf);
+		if (buf[4] != 99){
 			handlePacket(carBuffer, clientSocket, (char *) buf);
 		}else {
 			removeClient(clientSocket);
@@ -364,5 +363,6 @@ void *initServer(void *input){
 
 	return NULL;
 }
+
 
 }

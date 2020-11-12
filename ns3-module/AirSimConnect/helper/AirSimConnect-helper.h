@@ -3,6 +3,7 @@
 #define AIRSIMCONNECT_HELPER_H
 
 #include "ns3/AirSimConnect.h"
+#include "Packet-helper.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -28,6 +29,11 @@ struct Car {
     int carNumber;
     char payload[PAYLOADSIZE];
     struct Car *nextCar;
+    carData *data;
+    // TO DO: Refactor code to include the new packet struct
+
+    double getSpeed();
+
 };
 
 struct CarBuffer {
