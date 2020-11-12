@@ -12,6 +12,8 @@ def build(bld):
     module.source = [
         'model/AirSimConnect.cc',
         'helper/AirSimConnect-helper.cc',
+        'helper/Networks-helper.cc',
+        'helper/Packet-helper.cc',
         ]
 
     module_test = bld.create_ns3_module_test_library('AirSimConnect')
@@ -29,6 +31,8 @@ def build(bld):
     headers.source = [
         'model/AirSimConnect.h',
         'helper/AirSimConnect-helper.h',
+        'helper/Networks-helper.h',
+        'helper/Packet-helper.h',
         ]
 
     if bld.env.ENABLE_EXAMPLES:

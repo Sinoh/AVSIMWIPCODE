@@ -1,21 +1,18 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 
-#include "AirSimConnect-helper.h"
+#include "Networks-helper.h"
 
 namespace ns3 {
 
 // For DEBUG purposes only. Prints every byte in a buffer in Hex, Num, and Char
 void printBytes(char *PDU){
 	int i;
-	uint16_t length;
-	memcpy(&length, PDU, 2);
+	// uint16_t length;
+	// memcpy(&length, PDU, 2);
 
 	printf("\tHex\t|\tNum\t|\tChar\n");
-	for (i = 0; i < ntohs(length); i++){
+	for (i = 0; i < 100; i++){
 		printf("%i:\t%x\t|\t%i\t|\t%c\n", i, PDU[i] & 0xffff, PDU[i], PDU[i]);
-		if (i > 200){
-			return;
-		}
 	}
 }
 
@@ -277,110 +274,15 @@ static void growPollSet(int newSetSize)
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+// FUNCTIONS ABOVE THIS LINE SHOULD NOT BE TOUCHED IF YOU DO NOT KNOW WHAT YOU ARE DOING
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helper Functions (New Struct to hold Data) WIP
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct Car *initCar(struct CarBuffer *carBuffer, int socketNumber, int carNumber, char *payload){
-	struct Car *car = (struct Car*)sCalloc(1, sizeof(struct Car));
-	car->socketNumber = socketNumber;
-	car->carNumber = carNumber;
-	memset(car->payload, 0, PAYLOADSIZE);
-	memcpy(car->payload, payload, PAYLOADSIZE);
-	car->nextCar = NULL;
-
-	return car;
-
-}
-
-struct CarBuffer *initCarBuffer(){
-	struct CarBuffer *carBuffer = (struct CarBuffer*)malloc(sizeof(struct CarBuffer));
-	carBuffer->bufferSize = 0;
-	carBuffer->buffer = NULL;
-	carBuffer->flag = 1;
-
-	return carBuffer;
-}
-
-struct Car *addCar(struct Car *carList, struct Car * car){
-	if (carList != NULL) {
-		carList->nextCar = addCar(carList->nextCar, car);
-		return carList;
-	}
-	return car;
-
-}
-
-struct Car *findCar(struct CarBuffer *carBuffer, int socketNumber) {
-	struct Car *tempCar = carBuffer->buffer;
-	while (tempCar != NULL) {
-		if (socketNumber == tempCar->socketNumber) {
-			return tempCar;
-		}
-		tempCar = tempCar->nextCar;
-	}
-	return 0;
-}
-
-void updateCar(struct Car *carList, int socketNumber, char *payload) {
-	if (carList->socketNumber != socketNumber) {
-		updateCar(carList->nextCar, socketNumber, payload);
-	}
-	else {
-		memset(carList->payload, 0, PAYLOADSIZE);
-		memcpy(carList->payload, payload, PAYLOADSIZE);
-	}
-}
-
-int getCarPayload(struct Car *carList, int carNumber, char *payload) {
-	if (carList == NULL){
-		return 0;
-	}else if (carList->carNumber != carNumber) {
-		return getCarPayload(carList->nextCar, carNumber, payload);
-	}else{
-		memset(payload, 0, PAYLOADSIZE);
-		memcpy(payload, carList->payload, PAYLOADSIZE);
-		return 1;
-	}
-}
-
-struct Car *removeCar(int SocketNumber, struct Car *car, struct CarBuffer *carBuffer){
-	if (car == NULL){
-		return NULL;
-	}else if (car->socketNumber == SocketNumber){
-		memset(car->payload, 0, PAYLOADSIZE);
-		printf("Car on socket %d terminted\n", SocketNumber);
-		carBuffer->bufferSize--;
-		return car->nextCar;
-	}else{
-		car->nextCar = removeCar(SocketNumber, car->nextCar, carBuffer);
-		return car;
-	}
-	return 0;
-}
-
-void printCarList(struct CarBuffer *list) {
-	// For debugging purposes
-	if (list->buffer != NULL) {
-		printCars(list->buffer);
-	}
-}
-
-void printCars(struct Car *car) {
-	// Helper function for printLinkedList
-	printf("%d(%d) -> ", car->carNumber, car->socketNumber);
-	if (car->nextCar == NULL) {
-		printf("NULL\n");
-	}
-	else {
-		printCars(car->nextCar);
-	}
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helper Functions (Works for Now) WIP
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// This is used to update/init cars or send packets
+// Not complete yet
 void handlePacket(struct CarBuffer *carBuffer, int socketNumber, char *payload) {
 	char buf[PAYLOADSIZE];
 	struct Car* car;
@@ -398,13 +300,15 @@ void handlePacket(struct CarBuffer *carBuffer, int socketNumber, char *payload) 
 	//safeSend(socketNumber, buf, 1);
 }
 
+// Part of the tcp server functionality. Just a wrapper function
 void addNewClient(int mainServerSocket){
 	int newClientSocket = tcpAccept(mainServerSocket, DEBUG_FLAG);
 	printf("New Client socket: %i\n", newClientSocket);
 	addToPollSet(newClientSocket);
 }
 
-void removeClient(int clientSocket, struct CarBuffer *carBuffer){
+// Part of the tcp server functionality. Just a wrapper function
+void removeClient(int clientSocket){
 	printf("Client on socket %d terminted\n", clientSocket);
 	removeFromPollSet(clientSocket);
 	close(clientSocket);
@@ -415,17 +319,18 @@ void recvFromClient(int clientSocket, struct CarBuffer *carBuffer) {
 	memset(&buf, 0, PAYLOADSIZE);
 
 	if (safeRecv(clientSocket, buf, MSG_DONTWAIT) != 0){
-		if (strlen(buf) != 0){
+		printf("Checking buf size: %li\n", strlen(buf));
+		printBytes2(buf);
+		if (buf[4] != 99){
 			handlePacket(carBuffer, clientSocket, (char *) buf);
 		}else {
-			removeClient(clientSocket, carBuffer);
+			removeClient(clientSocket);
 			carBuffer->buffer = removeCar(clientSocket, carBuffer->buffer, carBuffer);
 		}
-
-
 	}
 }
 
+// Part of the tcp server functionality. Will also remove cars if no data is recv,///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void processSockets(int mainServerSocket, struct CarBuffer *carBuffer){
 
 	int socketToProcess = 0;
@@ -442,10 +347,12 @@ void processSockets(int mainServerSocket, struct CarBuffer *carBuffer){
 			counter = 0;
 		}
 	}
-
 	carBuffer->flag = 0;
 }
 
+
+// Used in ns3 to initialize this server
+// The input argument needs to be a new CarBuffer Struct
 void *initServer(void *input){
 	int mainServerSocket = 0;   //socket descriptor for the server socket
 
@@ -456,5 +363,6 @@ void *initServer(void *input){
 
 	return NULL;
 }
+
 
 }
