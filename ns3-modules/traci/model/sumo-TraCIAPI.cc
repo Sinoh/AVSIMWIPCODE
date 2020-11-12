@@ -34,6 +34,7 @@
 #include "ns3/core-module.h"
 
 #include "sumo-TraCIAPI.h"
+#include "traci-client.h"
 
 
 // ===========================================================================
@@ -53,7 +54,7 @@ TraCIAPI::TraCIAPI()
       person(*this), poi(*this), polygon(*this), route(*this),
       simulation(*this), trafficlights(*this),
       vehicle(*this), vehicletype(*this),
-      mySocket(nullptr) {
+      controlSocket(nullptr) {
     myDomains[RESPONSE_SUBSCRIBE_EDGE_VARIABLE] = &edge;
     myDomains[RESPONSE_SUBSCRIBE_GUI_VARIABLE] = &gui;
     myDomains[RESPONSE_SUBSCRIBE_JUNCTION_VARIABLE] = &junction;
@@ -75,21 +76,65 @@ TraCIAPI::TraCIAPI()
 
 
 TraCIAPI::~TraCIAPI() {
-    delete mySocket;
+    delete controlSocket;
 }
 
 
 void
 TraCIAPI::connect(const std::string& host, int port) {
     std::cout << "In connect with port" << port <<"\n";
-    mySocket = new tcpip::Socket("localhost", port);
-    
+    controlSocket = new tcpip::Socket("localhost", port);
+
     try {
-        mySocket->connect();
+        controlSocket->connect();
     } catch (tcpip::SocketException&) {
-        delete mySocket;
-        mySocket = nullptr;
+        delete controlSocket;
+        controlSocket = nullptr;
         throw;
+    }
+}
+// wait for AirSim to tell us how many cars in simulation
+  int
+  TraCIAPI::getNumberOfCarsMsg() {
+    std::vector<unsigned char>  buffer;
+    tcpip::Storage inMsg;
+    int num_cars;
+    
+      
+    while(buffer.size() == 0){
+      buffer = controlSocket->receive();
+
+      if (buffer.size() > 0){
+        inMsg.writePacket(&buffer[0], buffer.size());
+        num_cars = buffer.at(0) - int('0'); // get int
+      }
+      else{
+        ns3::Time checkTime = ns3::Seconds(0.5);
+        usleep(checkTime.GetMilliSeconds());
+      }
+    }
+    return num_cars; 
+  }
+
+void
+TraCIAPI::setUpListeningSocket(const std::string& host, int port) {
+    tcpip::Socket* newConnectionSocket;
+    int number_of_cars = 1; // default value until receive initMsg() from airSim
+    int connected_to = 0;
+    std::cout << "Setting up listening socket on port " << port <<"\n";
+    listeningSocket = new tcpip::Socket("localhost", port);
+
+    while(connected_to < number_of_cars){
+        newConnectionSocket = listeningSocket->accept(true);
+
+        if (!controlSocket){ // first connection is with control socket
+          controlSocket = newConnectionSocket;
+          number_of_cars = getNumberOfCarsMsg(); 
+        }
+        else{ // car connection
+          carSockets.push_back(newConnectionSocket);
+          connected_to += 1;
+        }
     }
 }
 
@@ -103,7 +148,7 @@ TraCIAPI::setOrder(int order) {
     outMsg.writeUnsignedByte(CMD_SETORDER);
     outMsg.writeInt(order);
     // send request message
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
     tcpip::Storage inMsg;
     check_resultState(inMsg, CMD_SETORDER);
 }
@@ -114,6 +159,7 @@ TraCIAPI::close() {
     send_commandClose();
     tcpip::Storage inMsg;
     std::string acknowledgement;
+    std::cout << "\nin close()\n";
     check_resultState(inMsg, CMD_CLOSE, false, &acknowledgement);
     closeSocket();
 }
@@ -121,14 +167,28 @@ TraCIAPI::close() {
 
 void
 TraCIAPI::closeSocket() {
-    if (mySocket == nullptr) {
+    if (controlSocket == nullptr) {
         return;
     }
-    mySocket->close();
-    delete mySocket;
-    mySocket = nullptr;
+    controlSocket->close();
+    delete controlSocket;
+    controlSocket = nullptr;
 }
 
+void
+TraCIAPI::send_simulateCommand(double time) const {
+  tcpip::Storage outMsg;
+    // command length
+    outMsg.writeUnsignedByte(1 + 1 + 8);
+    // command id
+    outMsg.writeUnsignedByte(CMD_SIMSTEP);
+    outMsg.writeDouble(time);
+    // send request message
+    std::cout << "Sending simulate command with time: " << time << "\n";
+    controlSocket->sendExact(outMsg);
+    // ns3::Time nextExpireTime = ns3::Simulator::Now()+ syncInterval;
+    // ns3::Simulator::Schedule(ns3::Simulator::Now(), &TraCIAPI::checkIfReceived, this, nextExpireTime);
+}
 
 void
 TraCIAPI::send_commandSimulationStep(double time) const {
@@ -140,7 +200,10 @@ TraCIAPI::send_commandSimulationStep(double time) const {
     outMsg.writeDouble(time);
     // send request message
     std::cout << "SENDING SIMULATION STEP MSG!in send_commandSimulationStep with time: " << time << "\n";
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
+    // ns3::Time nextExpireTime = ns3::Simulator::Now()+ syncInterval.GetSeconds();
+    // ns3::Simulator::Schedule(ns3::Simulator::Now(), &TraCIAPI::checkIfReceived, this, nextExpireTime);
+
 }
 
 
@@ -151,7 +214,7 @@ TraCIAPI::send_commandClose() const {
     outMsg.writeUnsignedByte(1 + 1);
     // command id
     outMsg.writeUnsignedByte(CMD_CLOSE);
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
 }
 
 
@@ -164,13 +227,13 @@ TraCIAPI::send_commandSetOrder(int order) const {
     outMsg.writeUnsignedByte(CMD_SETORDER);
     // client index
     outMsg.writeInt(order);
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
 }
 
 
 void
 TraCIAPI::send_commandGetVariable(int domID, int varID, const std::string& objID, tcpip::Storage* add) const {
-    if (mySocket == nullptr) {
+    if (controlSocket == nullptr) {
         throw tcpip::SocketException("Socket is not initialised");
     }
     tcpip::Storage outMsg;
@@ -191,13 +254,13 @@ TraCIAPI::send_commandGetVariable(int domID, int varID, const std::string& objID
         outMsg.writeStorage(*add);
     }
     // send request message
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
 }
 
 
 void
 TraCIAPI::send_commandSetValue(int domID, int varID, const std::string& objID, tcpip::Storage& content) const {
-    if (mySocket == nullptr) {
+    if (controlSocket == nullptr) {
         throw tcpip::SocketException("Socket is not initialised");
     }
     tcpip::Storage outMsg;
@@ -212,14 +275,14 @@ TraCIAPI::send_commandSetValue(int domID, int varID, const std::string& objID, t
     // data type
     outMsg.writeStorage(content);
     // send message
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
 }
 
 
 void
 TraCIAPI::send_commandSubscribeObjectVariable(int domID, const std::string& objID, double beginTime, double endTime,
         const std::vector<int>& vars) const {
-    if (mySocket == nullptr) {
+    if (controlSocket == nullptr) {
         throw tcpip::SocketException("Socket is not initialised");
     }
     tcpip::Storage outMsg;
@@ -240,14 +303,14 @@ TraCIAPI::send_commandSubscribeObjectVariable(int domID, const std::string& objI
         outMsg.writeUnsignedByte(vars[i]);
     }
     // send message
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
 }
 
 
 void
 TraCIAPI::send_commandSubscribeObjectContext(int domID, const std::string& objID, double beginTime, double endTime,
         int domain, double range, const std::vector<int>& vars) const {
-    if (mySocket == nullptr) {
+    if (controlSocket == nullptr) {
         throw tcpip::SocketException("Socket is not initialised");
     }
     tcpip::Storage outMsg;
@@ -271,7 +334,7 @@ TraCIAPI::send_commandSubscribeObjectContext(int domID, const std::string& objID
         outMsg.writeUnsignedByte(vars[i]);
     }
     // send message
-    mySocket->sendExact(outMsg);
+    controlSocket->sendExact(outMsg);
 }
 
 void
@@ -297,7 +360,7 @@ TraCIAPI::send_commandMoveToXY(const std::string& vehicleID, const std::string& 
 void
 TraCIAPI::check_resultState(tcpip::Storage& inMsg, int command, bool ignoreCommandId, std::string* acknowledgement) const {
     std::cout << "\nin check resultState!\n";
-    mySocket->receiveExact(inMsg);
+    controlSocket->receiveExact(inMsg);
     std::cout << "\n over recieve exact!!\n";
     int cmdLength;
     int cmdId;
@@ -339,7 +402,7 @@ TraCIAPI::check_testResultState(tcpip::Storage& inMsg, int command, bool ignoreC
     std::cout << "\nin check test resultState!\n";
     std::string num_cars;
     
-    mySocket->testReceiveExact(inMsg);
+    controlSocket->testReceiveExact(inMsg);
 
     std::cout << "\nDone with testRecieveExact and elaving check_testState ";
     // int cmdLength;
@@ -404,6 +467,8 @@ TraCIAPI::check_commandGetResult(tcpip::Storage& inMsg, int command, int expecte
 
 void
 TraCIAPI::processGET(tcpip::Storage& inMsg, int command, int expectedType, bool ignoreCommandId) const {
+    std::cout << "in processGET\n";
+
     check_resultState(inMsg, command, ignoreCommandId);
     check_commandGetResult(inMsg, command, expectedType, ignoreCommandId);
 }
@@ -642,8 +707,7 @@ void
 TraCIAPI::simulationStep(double time) {
     send_commandSimulationStep(time);
     tcpip::Storage inMsg;
-    std::cout << "\n sent simulationStep; going to sleep";
-
+    std::cout << "in simulationStep\n";
 
     check_resultState(inMsg, CMD_SIMSTEP);
 
@@ -663,20 +727,30 @@ TraCIAPI::simulationStep(double time) {
 }
 
 
-void
-TraCIAPI::checkIfReceived(ns3::Time expireTime) {
-  // check if data to read, if there is -> schedule broadcast
-  if (ns3::Simulator::Now() < expireTime){
-    ns3::Time checkTime = ns3::MilliSeconds(1);
-    ns3::Simulator::Schedule(checkTime, &TraCIAPI::checkIfReceived, this, expireTime);
-  }
-  else{
-    std::cout << "\nwe here command at " << ns3::Simulator::Now() << "\n";
+// void
+// TraCIAPI::checkIfReceived(ns3::Time expireTime) {
+//   std::vector<unsigned char>  inMsg;
+//   // check if data to read, if there is -> schedule broadcast
+//   if (ns3::Simulator::Now() < expireTime){
+//     inMsg = mySocket->receive();
 
-    ns3::Time checkTime = ns3::Minutes(3); // schedule any event in far future
-    ns3::Simulator::Schedule(checkTime, &TraCIAPI::checkIfReceived, this, expireTime);
-  }
-}
+//     if (inMsg.size() > 0){
+//       std::cout << "RECEIVED! at " << ns3::Simulator::Now().GetSeconds();
+//       std::cout << "inMsg contains:";
+//       for (unsigned i=0; i<inMsg.size(); i++)
+//         std::cout << ' ' << inMsg.at(i);
+//       std::cout << '\n';
+//     }
+//     ns3::Time checkTime = ns3::MilliSeconds(1);
+//     ns3::Simulator::Schedule(checkTime, &TraCIAPI::checkIfReceived, this, expireTime);
+//   }
+//   else{
+//     std::cout << "\nTime expired -> send new simulation command" << ns3::Simulator::Now() << "\n";
+//     // send new simulation step now
+//     ns3::Simulator::Schedule(ns3::Simulator::Now(), &simulationStep(),ns3::Simulator::Now());
+//   }
+// }
+
 
 void
 TraCIAPI::testSimulationStep(double time) {
@@ -725,7 +799,7 @@ TraCIAPI::load(const std::vector<std::string>& args) {
     content.writeUnsignedByte(CMD_LOAD);
     content.writeUnsignedByte(TYPE_STRINGLIST);
     content.writeStringList(args);
-    mySocket->sendExact(content);
+    controlSocket->sendExact(content);
     tcpip::Storage inMsg;
     check_resultState(inMsg, CMD_LOAD);
 }

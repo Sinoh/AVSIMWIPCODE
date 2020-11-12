@@ -70,6 +70,9 @@ public:
      * @exception tcpip::SocketException if the connection fails
      */
     void connect(const std::string& host, int port);
+    void setUpListeningSocket(const std::string& host, int port);
+    int getNumberOfCarsMsg();
+
 
     /// @brief set priority (execution order) for the client
     void setOrder(int order);
@@ -893,8 +896,8 @@ protected:
 
     /** @brief Sends a SimulationStep command
      */
+    void send_simulateCommand(double time) const;
     void send_commandSimulationStep(double time) const;
-
 
     /** @brief Sends a Close command
      */
@@ -964,7 +967,7 @@ protected:
 
     void check_testResultState(tcpip::Storage& inMsg, int command, bool ignoreCommandId = false, std::string* acknowledgement = 0) const;
 
-    void checkIfReceived(ns3::Time expireTime);
+    // void checkIfReceived(ns3::Time expireTime);
 
     /** @brief Validates the result state of a command
      * @return The command Id
@@ -994,7 +997,10 @@ protected:
 protected:
     std::map<int, TraCIScopeWrapper*> myDomains;
     /// @brief The socket
-    tcpip::Socket* mySocket;
+    tcpip::Socket* controlSocket;
+    tcpip::Socket* listeningSocket;
+    std::list<tcpip::Socket*> carSockets;
+    std::map<int, tcpip::Socket*> vehMap = {};
 };
 
 

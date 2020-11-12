@@ -54,7 +54,7 @@ public:
   void SumoSetup(std::function<Ptr<Node>()> includeNode, std::function<void(Ptr<Node>)> excludeNode);
 
   // testing setup
-  void testSumoSetup(std::function<Ptr<Node>()> includeNode, std::function<void(Ptr<Node>)> excludeNode);
+  void airSimSetup(std::function<Ptr<Node>()> includeNode, std::function<void(Ptr<Node>)> excludeNode);
 
   void SumoStop();
 
@@ -70,6 +70,13 @@ private:
   // perform sumo simulation for a certain time step
   void SumoSimulationStep(void);
   void testSumoSimulationStep(void);
+  void simulationStep(void);
+  void checkIfReceived(ns3::Time expireTime);
+
+  void setupCars();
+  void getCarInitMsg();
+  void readBroadcasts(ns3::Time sendBTime);
+
 
   // get current positions from sumo vehicles and update corresponding ns3 nodes positions
   void UpdatePositions(void);
@@ -86,6 +93,7 @@ private:
 
   // map every sumo vehicle to a ns3 node
   std::map< std::string, Ptr<Node> > m_vehicleNodeMap;
+  std::vector< std::string> split (std::string s, std::string delimiter);
 
   // a vehicle is untracked if it is simulated in sumo but not linked to a ns3 node because of an penetration rate < 1.0
   std::vector<std::string> m_untrackedVehicles;
@@ -103,12 +111,14 @@ private:
   std::string m_sumoCommand;
   std::string m_sumoConfigPath;
   std::string m_sumoBinaryPath;
-  uint16_t m_sumoPort;
+  uint16_t m_cntrlPort;
+  
   bool m_sumoGUI;
 
   double m_penetrationRate;
   ns3::Time m_synchInterval;
   ns3::Time m_startTime;
+  ns3::Time m_checkTime_ms;
   
   bool m_sumoLogFile;
   bool m_sumoStepLog;

@@ -29,6 +29,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <iterator>
 #include "ns3/core-module.h"
 
 
@@ -44,50 +45,16 @@ namespace ns3
     static TypeId tid =
         TypeId("ns3::TraciClient").SetParent<Object>()
     .SetGroupName ("TraciClient")
-    // .AddAttribute ("SumoConfigPath",
-    //               "Path to SUMO configuration file.",
-    //               StringValue (""),
-    //               MakeStringAccessor (&TraciClient::m_sumoConfigPath),
-    //               MakeStringChecker ())
-    // .AddAttribute ("SumoBinaryPath",
-    //               "Path to SUMO binary file.",
-    //               StringValue (""),
-    //               MakeStringAccessor (&TraciClient::m_sumoBinaryPath),
-    //               MakeStringChecker ())
     .AddAttribute ("AirSimPort",
                   "Port on which SUMO/Traci is listening for connection.",
                   UintegerValue (4001),
-                  MakeUintegerAccessor (&TraciClient::m_sumoPort),
+                  MakeUintegerAccessor (&TraciClient::m_cntrlPort),
                   MakeUintegerChecker<uint32_t> ())
     .AddAttribute ("AirSimWaitForSocket",
                   "Wait XX sec (=1e6 microsec) until sumo opens socket for traci connection.",
                   TimeValue (ns3::Seconds(8.0)),
                   MakeTimeAccessor (&TraciClient::m_sumoWaitForSocket),
                   MakeTimeChecker ())
-    // .AddAttribute ("SumoGUI",
-    //               "Turn SUMO GUI on/off.",
-    //               BooleanValue (false),
-    //               MakeBooleanAccessor (&TraciClient::m_sumoGUI),
-    //               MakeBooleanChecker ())
-    // .AddAttribute ("SumoAdditionalCmdOptions",
-    //               "Additional commandline options for SUMO start-up.",
-    //               StringValue (""),
-    //               MakeStringAccessor (&TraciClient::m_sumoAddCmdOpt),
-    //               MakeStringChecker ())
-    // .AddAttribute ("SumoSeed",
-    //               "Random Seed for SUMO.",
-    //               IntegerValue (0),
-    //               MakeIntegerAccessor (&TraciClient::m_sumoSeed),
-    //               MakeIntegerChecker<int> ())
-    // .AddAttribute ("SumoLogFile",
-    //               "Creates a SUMO error log file when set to true.",
-    //               BooleanValue (false),
-    //               MakeBooleanAccessor (&TraciClient::m_sumoLogFile),
-    //               MakeBooleanChecker ())
-    // .AddAttribute ("SumoStepLog", "Turns SUMO commandline step output on, if gui is turned off.",
-    //               BooleanValue (false),
-    //               MakeBooleanAccessor (&TraciClient::m_sumoStepLog),
-    //               MakeBooleanChecker ())
     .AddAttribute ("SynchInterval",
                   "Time interval for synchronizing the two simulators.",
                   TimeValue (ns3::Seconds(10.0)),
@@ -95,18 +62,14 @@ namespace ns3
                   MakeTimeChecker ())
     .AddAttribute ("StartTime",
                   "Start time of SUMO simulator; Offset time between ns3 and sumo simulation.",
-                  TimeValue (ns3::Seconds(5.0)),
+                  TimeValue (ns3::Seconds(0.0)),
                   MakeTimeAccessor (&TraciClient::m_startTime),
                   MakeTimeChecker ())
-    .AddAttribute ("PenetrationRate", "Rate of vehicles, equipped with wireless communication devices",
-                  DoubleValue (1.0),
-                  MakeDoubleAccessor (&TraciClient::m_penetrationRate),
-                  MakeDoubleChecker<double> ())
-    .AddAttribute ("Altitude",
-                  "Altitude of nodes in meter",
-                  DoubleValue (1.5),
-                  MakeDoubleAccessor (&TraciClient::m_altitude),
-                  MakeDoubleChecker<double> ())
+    .AddAttribute ("checkTime",
+                  "Interval ns3 checks if airSim is finished simulating.",
+                  TimeValue (ns3::MilliSeconds(5.0)),
+                  MakeTimeAccessor (&TraciClient::m_checkTime_ms),
+                  MakeTimeChecker ())
   ;
     return tid;
   }
@@ -117,14 +80,16 @@ namespace ns3
 
     m_sumoSeed = 0;
     m_altitude = 1.5;
-    m_sumoPort = 4001;
+    m_cntrlPort = 4001;
     m_sumoGUI = false;
     m_penetrationRate = 1.0;
     m_sumoLogFile = false;
     m_sumoStepLog = false;
-    m_sumoWaitForSocket = ns3::Seconds(5.0);
+    m_sumoWaitForSocket = ns3::Seconds(0);
+    m_checkTime_ms = ns3::MilliSeconds(5);
   }
 
+  // destructor!
   TraciClient::~TraciClient(void)
   {
     NS_LOG_FUNCTION(this);
@@ -166,107 +131,26 @@ namespace ns3
     return foundVeh;
   }
 
-  std::string
-  TraciClient::GetSumoCmdString(void)
-  {
-    std::cout << "in GetSumoCmdString!!!\n";
-    NS_LOG_FUNCTION(this);
-
-    if (m_sumoConfigPath == "")
-      {
-        NS_FATAL_ERROR("Error: No path specified for sumo configuration! Use .SetAttribute('m_sumoConfigPath', ...) before calling .SetupSUMO");
-      }
-
-    // sumo gui
-    if (m_sumoGUI)
-      {
-        m_sumoCommand = m_sumoBinaryPath + "sumo-gui -c";
-      }
-    else
-      {
-        m_sumoCommand = m_sumoBinaryPath + "sumo -c";
-      }
-
-    // sumo path
-    m_sumoCommand += " " + m_sumoConfigPath;
-
-    // remote port
-    m_sumoCommand += " --remote-port " + std::to_string(m_sumoPort);
-
-    // synchronisation interval
-    m_sumoCommand += " --step-length " + std::to_string(m_synchInterval.GetSeconds());
-
-    // sumo log file
-    if (m_sumoLogFile)
-      {
-        int pos = m_sumoConfigPath.find_last_of("/\\");
-        std::string sumoDir = m_sumoConfigPath.substr(0, pos);
-        m_sumoCommand += " --error-log " + sumoDir + "/SumoError.log";
-      }
-
-    // sumo step log
-    if (m_sumoStepLog)
-      {
-        m_sumoCommand += " --no-step-log false";
-      }
-    else
-      {
-        m_sumoCommand += " --no-step-log true";
-      }
-
-    // sumo random seed
-    if (m_sumoSeed)
-      {
-        m_sumoCommand += " --seed " + std::to_string(m_sumoSeed);
-      }
-
-    // sumo additional command line options
-    m_sumoCommand += " " + m_sumoAddCmdOpt;
-    m_sumoCommand += " --start --quit-on-end &";
-
-    return m_sumoCommand;
-  }
-
-  void TraciClient::connectToPort(int port){
-  
-    // connect to airSim via traci
-    try
-      {
-        this->TraCIAPI::connect("localhost", port);
-      }
-    catch (std::exception& e)
-      {
-        NS_FATAL_ERROR("Can not connect to sumo via traci: " << e.what());
-      }
-
-  }
 
   void
   TraciClient::SumoSetup(std::function<Ptr<Node>()> includeNode, std::function<void (Ptr<Node>)> excludeNode)
   {
     NS_LOG_FUNCTION(this);
 
-    m_sumoPort = GetFreePort(m_sumoPort);
+    m_cntrlPort = GetFreePort(m_cntrlPort); // should be 4001
 
     m_includeNode = includeNode;
     m_excludeNode = excludeNode;
-    m_sumoCommand = "python3 fake_clients.py 2";
-
-    // // start up sumo
-    // int startCmd = std::system(m_sumoCommand.c_str());
-    // if (startCmd)
-    //   {
-    //     NS_LOG_INFO("Used the following command to start up sumo: " << m_sumoCommand);
-    //   }
+    
 
     // wait 1 sec (=1e6 microsec) until sumo opens socket for traci connection
-    std::cout << "Sumo: wait for socket: " << m_sumoWaitForSocket.GetSeconds() << "s for port " << m_sumoPort << std::endl;
+    std::cout << "Sumo: wait for socket: " << m_sumoWaitForSocket.GetSeconds() << "s for port " << m_cntrlPort << std::endl;
     usleep(m_sumoWaitForSocket.GetMicroSeconds());
 
     // connect to sumo via traci
     try
       {
-        this->TraCIAPI::connect("localhost", m_sumoPort);
+        this->TraCIAPI::connect("localhost", m_cntrlPort);
       }
     catch (std::exception& e)
       {
@@ -276,8 +160,6 @@ namespace ns3
     // start sumo and simulate until the specified time
     std::cout << "starting AirSim and simulate until " << m_startTime.GetSeconds();
     this->TraCIAPI::simulationStep(m_startTime.GetSeconds());
-
-    std::cout << "Finished simulationStep, now going ot synchroniseVehicleNodeMap";
 
 
     // synchronise sumo vehicles with ns3 nodes
@@ -292,60 +174,163 @@ namespace ns3
     Simulator::Schedule(m_synchInterval, &TraciClient::SumoSimulationStep, this);
   }
 
+  // // wait for AirSim to tell us how many cars in simulation
+  // TODO: future- make a Car class and add relevant features and return Car
   void
-  TraciClient::testSumoSetup(std::function<Ptr<Node>()> includeNode, std::function<void (Ptr<Node>)> excludeNode)
+  TraciClient::getCarInitMsg() {
+    std::vector<unsigned char>  buffer;
+    std::cout << "buffer size is: " << buffer.size();
+    tcpip::Storage inMsg;
+    int num_cars;
+    
+    while(buffer.size() == 0){
+      buffer = controlSocket->receive();
+
+      if (buffer.size() > 0){
+        inMsg.writePacket(&buffer[0], buffer.size());
+        
+        // next lines just for debug
+        std::cout << "\nReceived msg at " << Simulator::Now().GetSeconds() <<  " seconds with msg:\n    ";
+        for (unsigned i=0; i<buffer.size(); i++)
+          std::cout << buffer.at(i);
+        std::cout << "\n";
+
+        num_cars = buffer.at(0) - int('0'); // get int
+      }
+      else{
+        usleep(m_checkTime_ms.GetMicroSeconds());
+      }
+    }
+    // return num_cars; 
+  }
+
+
+  // for string delimiter
+  std::vector< std::string> TraciClient::split (std::string s, std::string delimiter){
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    std::string token;
+    std::vector< std::string> res;
+
+    while ((pos_end = s.find (delimiter, pos_start)) != std::string::npos) {
+        token = s.substr (pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back (token);
+    }
+
+    res.push_back (s.substr (pos_start));
+    return res;
+  }
+
+  // connect to car sockets
+  void TraciClient::setupCars(){
+    for (std::list<tcpip::Socket*>::iterator it = carSockets.begin(); it != carSockets.end(); it++){
+        std::cout << "Iterating through the cars\n";
+        std::vector<unsigned char>  msg = (*it)->receive();
+        std::cout << "msg contains:\n";
+        for (unsigned i=0; i<msg.size(); i++)
+          std::cout << msg.at(i);
+        std::cout << "\n";
+
+        std::string delimiter = ",";
+        std::string msgStr(msg.begin(), msg.end());
+        std::vector<std::string> v = split (msgStr, delimiter);
+        std::string carId;
+        int loopNum = 0;
+        for (auto data : v){
+          if (loopNum == 0){
+            // std::cout << data << std::endl;
+            carId = data;
+            std::cout << "CarId: " << carId << "\n" << std::endl;
+          }
+          loopNum += 1;
+        } 
+
+        // it is not in the map, create a new ns3 node for it
+        // create new node by calling the include function
+        Ptr<ns3::Node> inNode = m_includeNode();
+        // register in the map (link vehicle to node!)
+        m_vehicleNodeMap.insert(std::pair<std::string, Ptr<Node>>(carId, inNode));
+
+    }
+    // for (int i=0; i < carSockets.size();i++){
+    //   std::cout << "for car " << i << ", read init msg and get id, create node and add to map, and add to mobility\n";
+      
+    // }
+    // TraciClient::getCarInitMsg();
+    std::cout << "m_vehicleNodeMap size is: " << m_vehicleNodeMap.size() << "\n";
+  }
+
+  void
+  TraciClient::airSimSetup(std::function<Ptr<Node>()> includeNode, std::function<void (Ptr<Node>)> excludeNode)
   {
     NS_LOG_FUNCTION(this);
 
-    m_sumoPort = GetFreePort(m_sumoPort);
+    m_cntrlPort = GetFreePort(m_cntrlPort);
 
     m_includeNode = includeNode;
     m_excludeNode = excludeNode;
 
-    // wait 1 sec (=1e6 microsec) until sumo opens socket for traci connection
-    std::cout << "Sumo: wait for socket: " << m_sumoWaitForSocket.GetSeconds() << "s for port " << m_sumoPort << std::endl;
-    usleep(m_sumoWaitForSocket.GetMicroSeconds());
+  
+    TraCIAPI::setUpListeningSocket("localhost", m_cntrlPort);
 
-    // connect to fakeclients via traci
-    try
-      {
-        this->TraCIAPI::connect("localhost", m_sumoPort);
+
+    std::cout << "Finished connection setup to airSim with:\n    Synctime: " << m_synchInterval.GetSeconds() << "s\n    port " << m_cntrlPort << "\n    numberOfCars: " <<  carSockets.size() <<"\n" << std::endl;
+
+    // TODO: here we want to get all initial positions -> add to map -> then send start Sim command
+
+    setupCars();
+
+    // for (int i=0; i < carSockets.size();i++){
+    //   std::cout << "for car " << i << ", read init msg and get id, create node and add to map, and add to mobility\n";
+    // }
+    
+
+
+    // this->TraCIAPI::send_simulateCommand(m_startTime.GetSeconds());
+
+
+    // ns3::Time checkTime = ns3::MilliSeconds(1); // next time to schedule to check if there is a packxet to read 
+    // ns3::Time expireTime = Simulator::Now() + m_synchInterval; // end of AirSims simulation time
+
+    // std::cout << "scheduling checkIfReceived at" << checkTime.GetSeconds() << "s and I am at" << Simulator::Now().GetSeconds() << " with expiration of " << expireTime.GetSeconds() <<"\n" ;
+
+    // Simulator::Schedule(checkTime, &TraciClient::checkIfReceived, this, expireTime);
+  }
+
+  void
+  TraciClient::readBroadcasts(ns3::Time sendBTime) {
+    std::cout << "time to read broadcasts!! Here with broadcast Time: "<< sendBTime;
+
+    // Simulator::Schedule(Simulator::Now(), &TraciClient::readBroadcasts, this, Simulator::Now() + m_synchInterval);
+  }
+
+  void
+  TraciClient::checkIfReceived(ns3::Time expireTime) {
+    std::vector<unsigned char>  inMsg;
+    ns3::Time checkTime = ns3::MilliSeconds(1) + Simulator::Now();
+
+    // usleep()
+
+    // check if data to read, if there is -> schedule broadcast
+    if (Simulator::Now() < expireTime){
+      inMsg = controlSocket->receive();
+
+      if (inMsg.size() > 0){
+        std::cout << "\nRECEIVED! at " << Simulator::Now().GetSeconds() << "with expiration of: " << expireTime.GetSeconds() << "scheduling next interval at " << checkTime.GetSeconds() << "\n";
+        std::cout << "inMsg contains:";
+        for (unsigned i=0; i<inMsg.size(); i++)
+          std::cout << inMsg.at(i);
+        std::cout << "\n";
       }
-    catch (std::exception& e)
-      {
-        NS_FATAL_ERROR("Can not connect to sumo via traci: " << e.what());
-      }
-
-    // start sumo and simulate until the specified time
-    // std::cout << "Starting fake clients and simulate until " << m_startTime.GetSeconds();
-
-
-    // this->TraCIAPI::testSimulationStep(m_startTime.GetSeconds());
-
-
-
-
-    // std::cout << "Finished simulationStep in setup\n Now scheduling test simulation\n";
-
-
-    // synchronise sumo vehicles with ns3 nodes
-    // SynchroniseVehicleNodeMap();
-
-    // std::cout << "scheduling testSumoSimulation at" << m_synchInterval.GetSeconds() << "s and I am at" << Simulator::Now().GetSeconds() << "\n";
-
-    // get current positions from sumo and uptdate positions
-    // UpdatePositions();
-
-    ns3::Time checkTime = ns3::MilliSeconds(1);
-    ns3::Time expireTime = Simulator::Now() + m_synchInterval;
-
-    std::cout << "scheduling checkIfReceived at" << checkTime.GetSeconds() << "s and I am at" << Simulator::Now().GetSeconds() << " with expiration of " << expireTime.GetSeconds() <<"\n" ;
-
-
-    Simulator::Schedule(checkTime, &TraciClient::checkIfReceived, this, expireTime);
-
-    // schedule event to command sumo the next simulation step
-    // Simulator::Schedule(m_synchInterval, &TraciClient::testSumoSimulationStep, this);
+      Simulator::Schedule(checkTime , &TraciClient::checkIfReceived, this, expireTime);
+    }
+    else{
+      std::cout << "\nTime expired -> send new simulation command" << ns3::Simulator::Now().GetSeconds() << "\n";
+      // send new simulation step now
+      this->TraCIAPI::send_simulateCommand(Simulator::Now().GetSeconds());
+      std::cout << "\nchecking if receive anything scheduling next time at " << ns3::Simulator::Now().GetSeconds() + checkTime.GetSeconds() << " with expiration of: " << m_synchInterval.GetSeconds() + expireTime.GetSeconds() << "\n";
+      Simulator::Schedule(checkTime, &TraciClient::checkIfReceived,this, m_synchInterval + ns3::Simulator::Now());
+    }
   }
 
   void
@@ -376,10 +361,7 @@ namespace ns3
       }
   }
 
-  // void
-  // TraciClient::doNow(){
-
-  // }
+  
 
   void
   TraciClient::testSumoSimulationStep()
@@ -593,7 +575,6 @@ TraciClient::PortFreeCheck (uint32_t portNum)
 {
     int socketFd;
     struct sockaddr_in address;
-    std::cout << "in PortFreeCheck with port" << portNum << "\n";
 
     // Creating socket file descriptor
     if ((socketFd = socket(AF_INET, SOCK_STREAM, 0)) == 0)
@@ -615,7 +596,6 @@ TraciClient::PortFreeCheck (uint32_t portNum)
     }
     else
     {
-        std::cout << "in PortFreeCheck where port is available\n";
       // port available
       ::close(socketFd); // goto to top empty namespace to avoid conclict with TraCIAPI::close()
       return true;
@@ -626,7 +606,6 @@ uint32_t
 TraciClient::GetFreePort (uint32_t portNum)
 {
     uint32_t port = portNum;
-    std::cout << "in PortFreeCheck\n";
 
     while (!PortFreeCheck(port))
     {
